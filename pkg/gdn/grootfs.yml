@@ -1,0 +1,9 @@
+store: /var/lib/gdn/grootfs/store
+driver: btrfs
+log_level: debug
+clean:
+  threshold_bytes: 1048576
+  ignore_images: []
+create:
+  insecure_registries: []
+  with_clean: true
