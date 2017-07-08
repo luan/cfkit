@@ -3,7 +3,7 @@ services:
   # Bind mounts /var/run to allow vsudd to connect to docker.sock, /var/vpnkit
   # for vpnkit coordination and /var/config/docker for the configuration file.
   - name: gdn
-    image: "luan/gdn:0007"
+    image: "luan/gdn:0008"
     capabilities:
      - all
     net: host
@@ -17,7 +17,7 @@ services:
      - /var/run:/var/run
      - /usr/bin/vpnkit-expose-port:/usr/bin/vpnkit-expose-port # userland proxy
      - /usr/bin/vpnkit-iptables-wrapper:/usr/bin/iptables # iptables wrapper
-    command: ["/usr/bin/start-garden"]
+    command: ["/usr/bin/start-bosh"]
 trust:
   image:
     - luan/gdn

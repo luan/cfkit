@@ -2,6 +2,12 @@
 
 set -e
 
+export LOG_DIR=/var/lib/gdn/log
+mkdir -p $LOG_DIR
+
+exec 1> $LOG_DIR/garden.out.log
+exec 2> $LOG_DIR/garden.err.log
+
 permit_device_control() {
   local devices_mount_info=$(cat /proc/self/cgroup | grep devices)
 
@@ -72,15 +78,15 @@ main() {
   export GARDEN_GRAPH_PATH=/var/lib/gdn/graph
   mkdir -p "${GARDEN_GRAPH_PATH}"
 
-  export LOG_DIR=/var/lib/gdn/log
-  mkdir -p $LOG_DIR
+
+    # --bind-socket /var/run/gdn.sock \
 
   /usr/bin/gdn server \
     --allow-host-access \
     --depot $depot_path \
-    --bind-socket /var/run/gdn.sock \
     --mtu $mtu \
     --graph=$GARDEN_GRAPH_PATH \
+    --bind-ip 0.0.0.0 --bind-port 7777 \
     --graph-cleanup-threshold-in-megabytes=1024 \
     --iptables-bin=/usr/bin/iptables \
     --image-plugin=/usr/bin/grootfs \
@@ -88,9 +94,8 @@ main() {
     --image-plugin-extra-arg=/etc/grootfs.yml \
     --privileged-image-plugin=/usr/bin/grootfs \
     --privileged-image-plugin-extra-arg=--config \
-    --privileged-image-plugin-extra-arg=/etc/grootfs.yml \
-    1> $LOG_DIR/stdout.log \
-    2> $LOG_DIR/stderr.log
+    --privileged-image-plugin-extra-arg=/etc/grootfs.yml &
 }
 
 main $@
+

@@ -63,11 +63,12 @@ RUN mkdir -p /tmp/gdn/ && \
   git clone https://github.com/cloudfoundry/garden-runc-release.git
 COPY build-gdn.sh /tmp/gdn/build-gdn.sh
 
+RUN mkdir -p /tmp/gdn/ && \
+  cd /tmp/gdn/ && \
+  git clone https://github.com/cloudfoundry/bosh-deployment.git
+
 WORKDIR /tmp/gdn
 RUN ./build-gdn.sh
-
-WORKDIR /
-COPY . .
 
 FROM linuxkit/alpine:9bcf61f605ef0ce36cc94d59b8eac307862de6e1 AS mirror
 
@@ -94,9 +95,22 @@ RUN rm -rf /out/etc/apk /out/lib/apk /out/var/cache
 FROM scratch
 ENTRYPOINT []
 WORKDIR /
+
 COPY --from=mirror /out/ /
+
+ENV BOSH_SHA256 81673e467a90a22a1365a5981c137b48eee10db8ed2af6adb67191ce35d12c73
+
+RUN set -x \
+	&& curl -fSL "https://s3.amazonaws.com/bosh-cli-artifacts/bosh-cli-2.0.26-linux-amd64" -o bosh \
+	&& echo "${BOSH_SHA256} *bosh" | sha256sum -c - \
+	&& mv bosh /usr/bin/bosh \
+	&& chmod a+x /usr/bin/bosh
+
 COPY --from=alpine /usr/bin/tar /usr/bin/init /usr/bin/runc /usr/bin/nstar /usr/bin/dadoo /usr/bin/gdn /usr/bin/
 COPY --from=alpine /usr/bin/grootfs /usr/bin/tardis /usr/bin/drax /usr/bin/
 COPY --from=alpine /usr/share/zoneinfo/UTC /etc/localtime
+COPY --from=alpine /tmp/gdn/bosh-deployment /usr/local/bosh-deployment
 COPY start-garden.sh /usr/bin/start-garden
+COPY start-bosh.sh /usr/bin/start-bosh
 COPY grootfs.yml /etc/grootfs.yml
+
