@@ -74,8 +74,9 @@ FROM linuxkit/alpine:9bcf61f605ef0ce36cc94d59b8eac307862de6e1 AS mirror
 # https://github.com/docker/docker/blob/master/project/PACKAGERS.md#runtime-dependencies
 # removed openssl as I do not think server needs it
 RUN mkdir -p /out/etc/apk && cp -r /etc/apk/* /out/etc/apk/
-RUN apk add --repository http://dl-3.alpinelinux.org/alpine/edge/community/ --allow-untrusted --no-cache --initdb -p /out \
+RUN apk add --repository http://dl-3.alpinelinux.org/alpine/edge/main/ --repository http://dl-3.alpinelinux.org/alpine/edge/community/ --allow-untrusted --no-cache --initdb -p /out \
 	alpine-baselayout \
+	bash \
 	btrfs-progs \
 	busybox \
 	ca-certificates \
@@ -84,6 +85,7 @@ RUN apk add --repository http://dl-3.alpinelinux.org/alpine/edge/community/ --al
 	e2fsprogs-extra \
 	iptables \
 	musl \
+	findutils \
 	shadow-uidmap \
 	xfsprogs \
 	xz
