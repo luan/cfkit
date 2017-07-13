@@ -1,51 +1,7 @@
-# FROM ubuntu:14.04
-
-# RUN apt-get update && apt-get install -y \
-# 		build-essential \
-# 		curl \
-# 		wget \
-# 		tar \
-# 		libssl-dev \
-# 		libreadline-dev \
-#     autoconf \
-#     pkg-config \
-#     quota \
-#     sudo \
-#     uidmap \
-#     ulogd \
-#   && \
-#   apt-get clean && \
-# 	rm -rf /usr/share/doc/* /usr/share/man/* /usr/share/groff/* /usr/share/info/*
-
-
-# # install libseccomp (needed for garden-runc)
-# RUN \
-#   wget https://github.com/seccomp/libseccomp/releases/download/v2.3.1/libseccomp-2.3.1.tar.gz && \
-#   tar zxf libseccomp-2.3.1.tar.gz && \
-#   cd libseccomp-2.3.1/  && \
-#   ./configure && \
-#   make && \
-#   make install
-
-# ENV GDN_VERSION 1.9.0
-# ENV GDN_SHA256 a19e5db692f0223b29639f2a609c67461d3a5795adc91df8985e42ebd55349a7
-
-# RUN set -x \
-# 	&& curl -fSL "https://github.com/cloudfoundry/garden-runc-release/releases/download/v${GDN_VERSION}/gdn-${GDN_VERSION}" -o gdn \
-# 	&& echo "${GDN_SHA256} *gdn" | sha256sum -c - \
-# 	&& mv gdn /usr/bin/gdn \
-# 	&& chmod a+x /usr/bin/gdn
-
-# COPY start-garden.sh /usr/local/bin/start-garden
-# RUN chmod +x /usr/local/bin/start-garden
-
-# COPY start-bosh.sh /usr/local/bin/start-bosh
-# RUN chmod +x /usr/local/bin/start-bosh
-
 FROM linuxkit/alpine:9bcf61f605ef0ce36cc94d59b8eac307862de6e1 as alpine
 RUN \
   apk add \
-	bash \
+  bash \
   btrfs-progs-dev \
   gcc \
   git \
@@ -55,25 +11,15 @@ RUN \
   linux-headers \
   make \
   tzdata \
-	tar \
+  tar \
   && true
-
-RUN mkdir -p /tmp/gdn/ && \
-  cd /tmp/gdn/ && \
-  git clone https://github.com/cloudfoundry/garden-runc-release.git
-COPY build-gdn.sh /tmp/gdn/build-gdn.sh
 
 RUN mkdir -p /tmp/gdn/ && \
   cd /tmp/gdn/ && \
   git clone https://github.com/cloudfoundry/bosh-deployment.git
 
-WORKDIR /tmp/gdn
-RUN ./build-gdn.sh
-
 FROM linuxkit/alpine:9bcf61f605ef0ce36cc94d59b8eac307862de6e1 AS mirror
 
-# https://github.com/docker/docker/blob/master/project/PACKAGERS.md#runtime-dependencies
-# removed openssl as I do not think server needs it
 RUN mkdir -p /out/etc/apk && cp -r /etc/apk/* /out/etc/apk/
 RUN apk add --repository http://dl-3.alpinelinux.org/alpine/edge/main/ --repository http://dl-3.alpinelinux.org/alpine/edge/community/ --allow-untrusted --no-cache --initdb -p /out \
 	alpine-baselayout \
@@ -81,15 +27,25 @@ RUN apk add --repository http://dl-3.alpinelinux.org/alpine/edge/main/ --reposit
 	btrfs-progs \
 	busybox \
 	ca-certificates \
+	coreutils \
 	curl \
 	e2fsprogs \
 	e2fsprogs-extra \
-	iptables \
-	musl \
 	findutils \
+	iptables \
+	libseccomp \
+	musl \
+	ruby \
+	ruby-json \
 	shadow-uidmap \
-	xfsprogs \
+	sudo \
+	util-linux \
 	xz
+
+RUN apk --no-cache add ca-certificates curl && \
+  curl -L -o /tmp/glibc.apk https://github.com/sgerrand/alpine-pkg-glibc/releases/download/2.25-r0/glibc-2.25-r0.apk && \
+  apk add --allow-untrusted -p /out /tmp/glibc.apk
+
 RUN rm -rf /out/etc/apk /out/lib/apk /out/var/cache
 
 FROM scratch
@@ -106,11 +62,40 @@ RUN set -x \
 	&& mv bosh /usr/bin/bosh \
 	&& chmod a+x /usr/bin/bosh
 
-COPY --from=alpine /usr/bin/tar /usr/bin/init /usr/bin/runc /usr/bin/nstar /usr/bin/dadoo /usr/bin/gdn /usr/bin/
-COPY --from=alpine /usr/bin/grootfs /usr/bin/tardis /usr/bin/drax /usr/bin/
 COPY --from=alpine /usr/share/zoneinfo/UTC /etc/localtime
 COPY --from=alpine /tmp/gdn/bosh-deployment /usr/local/bosh-deployment
+
+ENV GROOTFS_VERSION 0.21.0
+ENV DRAX_SHA256 6f935e69bdab2b903aaa7b6acda5e815ee6f56ca94ed0becbf02a79d6d29c333
+ENV TARDIS_SHA256 897499eb0d38e16d24d7b076ab3ce5562dbcec501376995a15cc9ab0876e39f3
+ENV GROOTFS_SHA256 2e0fa1d3942d11ed79620141ec52e8861eaf92033339e60f4efdc2b3df7f0375
+ENV GDN_VERSION 1.9.0
+ENV GDN_SHA256 a19e5db692f0223b29639f2a609c67461d3a5795adc91df8985e42ebd55349a7
+
+RUN set -x \
+	&& curl -fSL "https://github.com/cloudfoundry/grootfs/releases/download/v${GROOTFS_VERSION}/drax-${GROOTFS_VERSION}" -o drax \
+	&& echo "${DRAX_SHA256} *drax" | sha256sum -c - \
+	&& mv drax /usr/bin/drax \
+	&& chmod a+x /usr/bin/drax \
+	&& curl -fSL "https://github.com/cloudfoundry/grootfs/releases/download/v${GROOTFS_VERSION}/tardis-${GROOTFS_VERSION}" -o tardis \
+	&& echo "${TARDIS_SHA256} *tardis" | sha256sum -c - \
+	&& mv tardis /usr/bin/tardis \
+	&& chmod a+x /usr/bin/tardis \
+	&& curl -fSL "https://github.com/cloudfoundry/grootfs/releases/download/v${GROOTFS_VERSION}/grootfs-${GROOTFS_VERSION}" -o grootfs \
+	&& echo "${GROOTFS_SHA256} *grootfs" | sha256sum -c - \
+	&& mv grootfs /usr/bin/grootfs \
+	&& chmod a+x /usr/bin/grootfs \
+	&& curl -fSL "https://github.com/cloudfoundry/garden-runc-release/releases/download/v${GDN_VERSION}/gdn-${GDN_VERSION}" -o gdn \
+	&& echo "${GDN_SHA256} *gdn" | sha256sum -c - \
+	&& mv gdn /usr/bin/gdn \
+	&& chmod a+x /usr/bin/gdn
+
 COPY start-garden.sh /usr/bin/start-garden
 COPY start-bosh.sh /usr/bin/start-bosh
 COPY grootfs.yml /etc/grootfs.yml
+COPY grootfs-unprivileged.yml /etc/grootfs-unprivileged.yml
+COPY local-cpi-release.yml /usr/local/local-cpi-release.yml
 
+# COPY linuxbin/bosh /usr/local/bin/bosh
+# RUN set -x \
+# 	&& chmod a+x /usr/local/bin/bosh

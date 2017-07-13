@@ -1,4 +1,4 @@
-store: /var/lib/gdn/grootfs/store
+store: /var/lib/gdn/grootfs/store/privileged
 driver: btrfs
 log_level: debug
 clean:
@@ -7,3 +7,4 @@ clean:
 create:
   insecure_registries: []
   with_clean: true
+  without_mount: false
