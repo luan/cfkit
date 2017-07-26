@@ -23,7 +23,7 @@ popd
       cat <<EOF > $dir/.envrc
 export BOSH_ENVIRONMENT="10.245.0.3"
 export BOSH_CLIENT=admin
-export BOSH_CLIENT_SECRET=$(gobosh int $dir/pkg/gdn/rootfs/etc/creds.yml --path /admin_password))
+export BOSH_CLIENT_SECRET=$(gobosh int $dir/pkg/gdn/rootfs/etc/creds.yml --path /admin_password)
 export BOSH_CA_CERT="ca.crt"
 export BOSH_GW_HOST=10.245.0.3
 export BOSH_GW_USER="jumpbox"
