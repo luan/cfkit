@@ -1,0 +1,60 @@
+#!/bin/bash -l
+
+set -e -x
+
+main() {
+  source /usr/bin/utils.sh
+
+  echo "nameserver 8.8.8.8" > /etc/resolv.conf
+
+  # check for /proc/sys being mounted readonly, as systemd does
+  if ! grep -qs '/sys' /proc/mounts; then
+    mount -t sysfs sysfs /sys
+  fi
+
+  local mtu=$(cat /sys/class/net/$(ip route get 8.8.8.8|awk '{ print $5 }')/mtu)
+  local tmpdir=$(mktemp -d)
+
+  local depot_path=/var/vcap/depot
+
+  mkdir -p $depot_path
+
+  export TMPDIR=$tmpdir
+  export TEMP=$tmpdir
+  export TMP=$tmpdir
+
+  # GARDEN_GRAPH_PATH is the root of the docker image filesystem
+  export GARDEN_GRAPH_PATH=/var/vcap/graph
+  mkdir -p "${GARDEN_GRAPH_PATH}"
+
+  mkdir -p "$(store_mountpoint)/grootfs/store"
+
+  permit_device_control
+  create_loop_devices 256
+
+  # overlay-xfs-setup
+  btrfs-setup
+
+  /usr/bin/gdn server \
+    --allow-host-access \
+    --depot $depot_path \
+    --mtu $mtu \
+    --graph=$GARDEN_GRAPH_PATH \
+    --bind-ip 0.0.0.0 --bind-port 7777 \
+    --graph-cleanup-threshold-in-megabytes=1024 \
+    --iptables-bin=/usr/bin/iptables \
+    --image-plugin=/usr/bin/grootfs \
+    --image-plugin-extra-arg=--config \
+    --image-plugin-extra-arg=/etc/grootfs-unprivileged.yml \
+    --privileged-image-plugin=/usr/bin/grootfs \
+    --privileged-image-plugin-extra-arg=--config \
+    --privileged-image-plugin-extra-arg=/etc/grootfs-privileged.yml &
+
+  vpnkit-expose-port -i \
+    -host-ip      127.0.0.1 -host-port      7777 \
+    -container-ip 127.0.0.1 -container-port 7777 \
+    -no-local-ip
+}
+
+main $@
+

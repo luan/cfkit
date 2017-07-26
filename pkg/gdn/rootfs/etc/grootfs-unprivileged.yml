@@ -1,4 +1,4 @@
-store: /var/lib/gdn/grootfs/store/unprivileged
+store: /var/vcap/grootfs/store/unprivileged
 driver: btrfs
 log_level: debug
 clean:

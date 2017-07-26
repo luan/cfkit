@@ -1,0 +1,139 @@
+#!/bin/bash
+
+set -ex
+
+main() {
+  source /usr/bin/utils.sh
+
+  mkdir -p "$(store_mountpoint)/grootfs/store"
+
+  create_loop_devices
+  permit_device_control
+
+  pre_init_store unprivileged /etc/grootfs-unprivileged.yml
+  init_unprivileged_store
+
+  pre_init_store privileged /etc/grootfs-privileged.yml
+  init_privileged_store
+
+  tardis_setup
+}
+
+unify_projectid_dir() {
+  local store_root=$1
+
+  local store1="${store_root}/unprivileged"
+  local store2="${store_root}/privileged"
+  local projectids_dir="${store_root}/projectids"
+
+  mkdir -p $projectids_dir
+  rm -rf "${store1}/projectids"
+  rm -rf "${store2}/projectids"
+
+  ln -s $projectids_dir "${store1}/projectids"
+  ln -s $projectids_dir "${store2}/projectids"
+}
+
+pre_init_store() {
+  local store_name=$1
+  local store_config=$2
+  local store_path="$(store_mountpoint)/grootfs/store/${store_name}"
+  local external_log_size_file="${store_path}.external-log.size"
+
+  converge_store ${store_name}
+
+  if store_needs_cleanup ${store_name}
+  then
+    cleanup_store ${store_name} ${store_config}
+  fi
+
+  echo -n 0 > $external_log_size_file
+}
+
+init_privileged_store() {
+  local config_path=/etc/grootfs-privileged.yml
+
+  echo "Initialising privilged store using config at ${config_path}"
+
+  grootfs --config ${config_path} init-store \
+    --external-logdev-size-mb 0 \
+    --store-size-bytes $(volume_size)
+}
+
+init_unprivileged_store() {
+  local config_path=/etc/grootfs-unprivileged.yml
+
+  echo "Initialising unprivileged store using config at ${config_path}"
+
+  grootfs --config ${config_path} init-store \
+    --store-size-bytes $(volume_size) \
+    --external-logdev-size-mb 0 \
+    --uid-mapping "$(unprivileged_root_mapping)" \
+    --uid-mapping "$(unprivileged_range_mapping)" \
+    --gid-mapping "$(unprivileged_root_mapping)" \
+    --gid-mapping "$(unprivileged_range_mapping)"
+}
+
+
+tardis_setup() {
+  echo "setting up tardis..."
+  chmod u+s /usr/bin/tardis
+}
+
+# Temporary upgrade path
+converge_store() {
+  local store_type=$1
+
+  local old_volume_path="$(store_mountpoint)/grootfs/volume_${store_type}"
+  local new_volume_path="$(store_mountpoint)/grootfs/store/${store_type}.backing-store"
+  local store_path="$(store_mountpoint)/grootfs/store/${store_type}"
+
+  if mount | grep $old_volume_path | grep xfs
+  then
+    mv $old_volume_path $new_volume_path
+    mount -t xfs -o remount,noatime,pquota,nobarrier $new_volume_path $store_path
+  fi
+}
+
+current_external_log_file_size() {
+  local external_log_file=$1
+  local current_log_size_path="${external_log_file}.size"
+
+  if [ -f $current_log_size_path ]
+  then
+    cat $current_log_size_path
+  else
+    echo -n "0"
+  fi
+}
+
+# If the logdev size changes, or if it switches from using/not using the
+# store needs to be recreated
+store_needs_cleanup() {
+  local store_name=$1
+
+  local external_log_file="$(store_mountpoint)/grootfs/store/${store_name}.external-log"
+  local current_logsize=$(current_external_log_file_size $external_log_file)
+
+  [ $current_logsize != 0 ]
+}
+
+cleanup_store() {
+  local store_name=$1
+  local config_path=$2
+
+  local store_path="$(store_mountpoint)/grootfs/store/${store_name}"
+  local volume_path="${store_path}.backing-store"
+  local external_log_file="${store_path}.external-log"
+
+  delete_store $config_path $store_path $volume_path
+
+  for loopdevice_path in $(losetup -j $external_log_file | cut -d ":" -f1)
+  do
+    losetup -d $loopdevice_path
+  done
+
+  rm -f $external_log_file
+}
+
+main

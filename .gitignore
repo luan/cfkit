@@ -2,3 +2,9 @@
 *-initrd.img
 *-kernel
 *-state/
+ca.crt
+jumpbox.key
+.envrc
+creds.yml
+pkg/gdn/rootfs/etc/creds.yml
+vars-store.yml

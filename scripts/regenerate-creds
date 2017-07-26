@@ -1,0 +1,32 @@
+#!/bin/bash
+
+dir=$PWD
+
+pushd ~/workspace/bosh-deployment
+  gobosh int bosh.yml \
+    -o jumpbox-user.yml \
+    -o bosh-lite.yml \
+    -o bosh-lite-runc.yml \
+    -o warden/cpi.yml \
+    -v director_name=warden \
+    -v internal_cidr=10.245.0.0/24 \
+    -v internal_gw=10.245.0.1 \
+    -v internal_ip="10.245.0.3" \
+    -v garden_host="127.0.0.1" \
+    --vars-store=$dir/pkg/gdn/rootfs/etc/creds.yml \
+    > /dev/null
+popd
+
+      bosh int "$dir/pkg/gdn/rootfs/etc/creds.yml" --path /director_ssl/ca > "$dir/ca.crt"
+      bosh int "$dir/pkg/gdn/rootfs/etc/creds.yml" --path /jumpbox_ssh/private_key > "$dir/jumpbox.key"
+
+      cat <<EOF > $dir/.envrc
+export BOSH_ENVIRONMENT="10.245.0.3"
+export BOSH_CLIENT=admin
+export BOSH_CLIENT_SECRET=$(gobosh int $dir/pkg/gdn/rootfs/etc/creds.yml --path /admin_password))
+export BOSH_CA_CERT="ca.crt"
+export BOSH_GW_HOST=10.245.0.3
+export BOSH_GW_USER="jumpbox"
+export BOSH_GW_PRIVATE_KEY="jumpbox.key"
+EOF
+

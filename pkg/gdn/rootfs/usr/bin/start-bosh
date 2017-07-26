@@ -1,0 +1,115 @@
+#!/bin/bash -l
+
+set -x
+
+export LOG_DIR=/var/vcap/log
+mkdir -p $LOG_DIR
+
+exec 1> "$LOG_DIR/bosh.out.log"
+exec 2> "$LOG_DIR/bosh.err.log"
+
+main() {
+  export OUTER_CONTAINER_IP=$(ruby -rsocket -e 'puts Socket.ip_address_list
+                          .reject { |addr| !addr.ip? || addr.ipv4_loopback? || addr.ipv6? }
+                          .map { |addr| addr.ip_address }')
+
+  export GARDEN_HOST=${OUTER_CONTAINER_IP}
+
+  start-garden \
+    1> "$LOG_DIR/garden.out.log" \
+    2> "$LOG_DIR/garden.err.log" &
+
+  while ! nc -z $GARDEN_HOST 7777 ; do
+    sleep 1
+  done
+
+  export BOSH_HOME=/var/vcap/.bosh
+  mkdir -p $BOSH_HOME
+  export BOSH_CONFIG=$BOSH_HOME/config
+  export HOME=/var/vcap
+
+  local local_bosh_dir
+  local_bosh_dir="/var/vcap/director"
+  cp -a /usr/local/bosh-deployment /var/vcap
+  sed -i '/current_manifest_sha/s/: ".*"/: ""/' "${local_bosh_dir}/state.json"
+  local installation_id=$(jq -r .installation_id "${local_bosh_dir}/state.json")
+  rm -rf "${BOSH_HOME}/installations/${installation_id}/packages"
+
+  pushd /var/vcap/bosh-deployment
+      export BOSH_DIRECTOR_IP="10.245.0.3"
+      export BOSH_ENVIRONMENT="warden-director"
+
+      mkdir -p ${local_bosh_dir}
+      bosh --tty create-release --force --dir /usr/local/bosh-warden-cpi-release --tarball /var/vcap/warden-cpi-release.tgz
+
+      bosh int bosh.yml \
+        -o jumpbox-user.yml \
+        -o bosh-lite.yml \
+        -o bosh-lite-runc.yml \
+        -o warden/cpi.yml \
+        -o /usr/local/local-cpi-release.yml \
+        -v director_name=warden \
+        -v internal_cidr=10.245.0.0/24 \
+        -v internal_gw=10.245.0.1 \
+        -v internal_ip="${BOSH_DIRECTOR_IP}" \
+        -v garden_host="${GARDEN_HOST}" \
+        ${@} > "${local_bosh_dir}/bosh-director.yml"
+
+      echo -e "\n# $(date)" >> "${local_bosh_dir}/bosh-director.yml"
+
+      bosh --tty create-env "${local_bosh_dir}/bosh-director.yml" \
+              --vars-store="/etc/creds.yml" \
+              --state="${local_bosh_dir}/state.json"
+
+      bosh int "/etc/creds.yml" --path /director_ssl/ca > "${local_bosh_dir}/ca.crt"
+      bosh int "/etc/creds.yml" --path /jumpbox_ssh/private_key > "${local_bosh_dir}/jumpbox.key"
+      bosh --tty -e "${BOSH_DIRECTOR_IP}" --ca-cert "${local_bosh_dir}/ca.crt" alias-env "${BOSH_ENVIRONMENT}"
+
+      cat <<EOF > "${local_bosh_dir}/bosh_env"
+      export BOSH_ENVIRONMENT="${BOSH_DIRECTOR_IP}"
+      export BOSH_CLIENT=admin
+      export BOSH_CLIENT_SECRET=`bosh int "/etc/creds.yml" --path /admin_password`
+      export BOSH_CA_CERT="${local_bosh_dir}/ca.crt"
+      export BOSH_GW_PRIVATE_KEY="${local_bosh_dir}/jumpbox.key"
+EOF
+      source "${local_bosh_dir}/bosh_env"
+      cat "${local_bosh_dir}/bosh_env"
+      cat "${local_bosh_dir}/ca.crt"
+      cat "${local_bosh_dir}/jumpbox.key"
+
+      bosh --tty -n update-cloud-config warden/cloud-config.yml
+
+      route add -net 10.244.0.0/16 gw ${BOSH_DIRECTOR_IP}
+  popd
+
+  ROUTER_IP=10.244.0.34
+  vpnkit-expose-port -i \
+    -host-ip      ${ROUTER_IP} -host-port      443 \
+    -container-ip ${ROUTER_IP} -container-port 443 \
+    -no-local-ip &
+
+  vpnkit-expose-port -i \
+    -host-ip      ${ROUTER_IP} -host-port      80 \
+    -container-ip ${ROUTER_IP} -container-port 80 \
+    -no-local-ip &
+
+  vpnkit-expose-port -i \
+    -host-ip      ${ROUTER_IP} -host-port      2222 \
+    -container-ip ${ROUTER_IP} -container-port 2222 \
+    -no-local-ip &
+
+  vpnkit-expose-port -i \
+    -host-ip      ${BOSH_DIRECTOR_IP} -host-port      22 \
+    -container-ip ${BOSH_DIRECTOR_IP} -container-port 22 \
+    -no-local-ip &
+
+  vpnkit-expose-port -i \
+    -host-ip      ${BOSH_DIRECTOR_IP} -host-port      25555 \
+    -container-ip ${BOSH_DIRECTOR_IP} -container-port 25555 \
+    -no-local-ip &
+
+  wait
+}
+
+main $@
+

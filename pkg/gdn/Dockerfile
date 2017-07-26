@@ -1,27 +1,7 @@
-FROM linuxkit/alpine:9bcf61f605ef0ce36cc94d59b8eac307862de6e1 as alpine
-RUN \
-  apk add \
-  bash \
-  btrfs-progs-dev \
-  gcc \
-  git \
-  go \
-  libc-dev \
-  libseccomp-dev \
-  linux-headers \
-  make \
-  tzdata \
-  tar \
-  && true
-
-RUN mkdir -p /tmp/gdn/ && \
-  cd /tmp/gdn/ && \
-  git clone https://github.com/cloudfoundry/bosh-deployment.git
-
 FROM linuxkit/alpine:9bcf61f605ef0ce36cc94d59b8eac307862de6e1 AS mirror
 
 RUN mkdir -p /out/etc/apk && cp -r /etc/apk/* /out/etc/apk/
-RUN apk add --repository http://dl-3.alpinelinux.org/alpine/edge/main/ --repository http://dl-3.alpinelinux.org/alpine/edge/community/ --allow-untrusted --no-cache --initdb -p /out \
+RUN apk add --repository http://dl-3.alpinelinux.org/alpine/edge/testing/ --repository http://dl-3.alpinelinux.org/alpine/edge/main/ --repository http://dl-3.alpinelinux.org/alpine/edge/community/ --allow-untrusted --no-cache --initdb -p /out \
 	alpine-baselayout \
 	bash \
 	btrfs-progs \
@@ -31,16 +11,22 @@ RUN apk add --repository http://dl-3.alpinelinux.org/alpine/edge/main/ --reposit
 	curl \
 	e2fsprogs \
 	e2fsprogs-extra \
+	file \
 	findutils \
+	git \
+	jq \
 	iptables \
 	libseccomp \
 	musl \
 	ruby \
 	ruby-json \
 	shadow-uidmap \
+	strace \
 	sudo \
 	util-linux \
+	xfsprogs \
 	xz
+
 
 RUN apk --no-cache add ca-certificates curl && \
   curl -L -o /tmp/glibc.apk https://github.com/sgerrand/alpine-pkg-glibc/releases/download/2.25-r0/glibc-2.25-r0.apk && \
@@ -54,16 +40,13 @@ WORKDIR /
 
 COPY --from=mirror /out/ /
 
-ENV BOSH_SHA256 81673e467a90a22a1365a5981c137b48eee10db8ed2af6adb67191ce35d12c73
+ENV BOSH_SHA256 8b4c003731e1287e414e88134658b35b59c2df48c89f360a707361a8e28067f9
 
 RUN set -x \
-	&& curl -fSL "https://s3.amazonaws.com/bosh-cli-artifacts/bosh-cli-2.0.26-linux-amd64" -o bosh \
+	&& curl -fSL "https://s3.amazonaws.com/bosh-cli-artifacts/bosh-cli-2.0.29-linux-amd64" -o bosh \
 	&& echo "${BOSH_SHA256} *bosh" | sha256sum -c - \
 	&& mv bosh /usr/bin/bosh \
 	&& chmod a+x /usr/bin/bosh
-
-COPY --from=alpine /usr/share/zoneinfo/UTC /etc/localtime
-COPY --from=alpine /tmp/gdn/bosh-deployment /usr/local/bosh-deployment
 
 ENV GROOTFS_VERSION 0.21.0
 ENV DRAX_SHA256 6f935e69bdab2b903aaa7b6acda5e815ee6f56ca94ed0becbf02a79d6d29c333
@@ -90,12 +73,8 @@ RUN set -x \
 	&& mv gdn /usr/bin/gdn \
 	&& chmod a+x /usr/bin/gdn
 
-COPY start-garden.sh /usr/bin/start-garden
-COPY start-bosh.sh /usr/bin/start-bosh
-COPY grootfs.yml /etc/grootfs.yml
-COPY grootfs-unprivileged.yml /etc/grootfs-unprivileged.yml
-COPY local-cpi-release.yml /usr/local/local-cpi-release.yml
+COPY rootfs /
 
-# COPY linuxbin/bosh /usr/local/bin/bosh
-# RUN set -x \
-# 	&& chmod a+x /usr/local/bin/bosh
+COPY bosh-deployment /usr/local/bosh-deployment
+COPY bosh-warden-cpi-release /usr/local/bosh-warden-cpi-release
+

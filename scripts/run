@@ -1,0 +1,9 @@
+#!/bin/bash
+
+sudo ifconfig lo0 alias 10.245.0.3 up
+sudo ifconfig lo0 alias 10.244.0.34 up
+
+HASH=0009 make
+moby build -disable-content-trust -name bosh-for-mac base.yml gdn.yml
+linuxkit -v run hyperkit -networking=vpnkit -vsock-ports=2376 -disk size=50G -cpus 4 -mem 8192 bosh-for-mac
+
