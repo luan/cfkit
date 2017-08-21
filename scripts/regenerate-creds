@@ -3,6 +3,7 @@
 dir=$PWD
 
 pushd ~/workspace/bosh-deployment
+  rm $dir/pkg/gdn/rootfs/etc/creds.yml
   gobosh int bosh.yml \
     -o jumpbox-user.yml \
     -o bosh-lite.yml \
@@ -17,8 +18,8 @@ pushd ~/workspace/bosh-deployment
     > /dev/null
 popd
 
-      bosh int "$dir/pkg/gdn/rootfs/etc/creds.yml" --path /director_ssl/ca > "$dir/ca.crt"
-      bosh int "$dir/pkg/gdn/rootfs/etc/creds.yml" --path /jumpbox_ssh/private_key > "$dir/jumpbox.key"
+      gobosh int "$dir/pkg/gdn/rootfs/etc/creds.yml" --path /director_ssl/ca > "$dir/ca.crt"
+      gobosh int "$dir/pkg/gdn/rootfs/etc/creds.yml" --path /jumpbox_ssh/private_key > "$dir/jumpbox.key"
 
       cat <<EOF > $dir/.envrc
 export BOSH_ENVIRONMENT="10.245.0.3"

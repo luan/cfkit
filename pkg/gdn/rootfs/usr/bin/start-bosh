@@ -46,7 +46,9 @@ main() {
         -o jumpbox-user.yml \
         -o bosh-lite.yml \
         -o bosh-lite-runc.yml \
+        -o bosh-lite-grootfs.yml \
         -o warden/cpi.yml \
+        -o warden/cpi-grootfs.yml \
         -o /usr/local/local-cpi-release.yml \
         -v director_name=warden \
         -v internal_cidr=10.245.0.0/24 \
