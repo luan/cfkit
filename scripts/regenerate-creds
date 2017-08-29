@@ -2,9 +2,15 @@
 
 dir=$PWD
 
+BOSH=bosh
+
+if which gobosh; then
+  BOSH=gobosh
+fi
+
 pushd ~/workspace/bosh-deployment
   rm $dir/pkg/gdn/rootfs/etc/creds.yml
-  gobosh int bosh.yml \
+  $BOSH int bosh.yml \
     -o jumpbox-user.yml \
     -o bosh-lite.yml \
     -o bosh-lite-runc.yml \
@@ -18,13 +24,13 @@ pushd ~/workspace/bosh-deployment
     > /dev/null
 popd
 
-      gobosh int "$dir/pkg/gdn/rootfs/etc/creds.yml" --path /director_ssl/ca > "$dir/ca.crt"
-      gobosh int "$dir/pkg/gdn/rootfs/etc/creds.yml" --path /jumpbox_ssh/private_key > "$dir/jumpbox.key"
+      $BOSH int "$dir/pkg/gdn/rootfs/etc/creds.yml" --path /director_ssl/ca > "$dir/ca.crt"
+      $BOSH int "$dir/pkg/gdn/rootfs/etc/creds.yml" --path /jumpbox_ssh/private_key > "$dir/jumpbox.key"
 
       cat <<EOF > $dir/.envrc
 export BOSH_ENVIRONMENT="10.245.0.3"
 export BOSH_CLIENT=admin
-export BOSH_CLIENT_SECRET=$(gobosh int $dir/pkg/gdn/rootfs/etc/creds.yml --path /admin_password)
+export BOSH_CLIENT_SECRET=$($BOSH int $dir/pkg/gdn/rootfs/etc/creds.yml --path /admin_password)
 export BOSH_CA_CERT="ca.crt"
 export BOSH_GW_HOST=10.245.0.3
 export BOSH_GW_USER="jumpbox"

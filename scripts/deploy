@@ -1,5 +1,11 @@
 #!/bin/bash
 
+BOSH=bosh
+
+if which gobosh; then
+  BOSH=gobosh
+fi
+
 set -e
 git submodule update --init --recursive
 
@@ -10,10 +16,10 @@ if ! [ -f "${stemcell_path}" ]; then
 fi
 
 
-gobosh us "${stemcell_path}"
-gobosh ucc -n cf-deployment/bosh-lite/cloud-config.yml
+$BOSH us "${stemcell_path}"
+$BOSH ucc -n cf-deployment/bosh-lite/cloud-config.yml
 
-gobosh -d cf deploy cf-deployment/cf-deployment.yml \
+$BOSH -d cf deploy cf-deployment/cf-deployment.yml \
   -v system_domain=bosh-lite.com --vars-store=./creds.yml \
   -o cf-deployment/operations/use-compiled-releases.yml \
   -o cf-deployment/operations/experimental/use-grootfs.yml \
