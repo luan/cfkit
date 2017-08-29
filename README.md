@@ -6,7 +6,7 @@ Currently only runs on macOS.
 
 To run CFKit you need:
 
- * [BOSH CLI](https://bosh.io/docs/cli-v2.html) _installed as either `bosh` or
+ * [BOSH CLI](https://bosh.io/docs/cli-v2.html) installed as either `bosh` or
    `gobosh` in your `PATH`
  * [Moby](http://mobyproject.org/) - Available as a brew formula
    (_linuxkit/linuxkit/moby_) or via `go get github.com/moby/tool/cmd/moby`
