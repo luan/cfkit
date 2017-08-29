@@ -1,0 +1,14 @@
+---
+
+- type: replace
+  path: /instance_groups/name=diego-cell/jobs/name=garden/properties/garden/apparmor_profile?
+  value: ""
+
+
+- type: replace
+  path: /instance_groups/name=diego-cell/jobs/name=grootfs/properties/grootfs
+  value:
+    driver: btrfs
+    log_level: debug
+    persistent_image_list:
+    - /var/vcap/packages/cflinuxfs2/rootfs.tar

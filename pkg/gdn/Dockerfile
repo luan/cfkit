@@ -73,8 +73,7 @@ RUN set -x \
 	&& mv gdn /usr/bin/gdn \
 	&& chmod a+x /usr/bin/gdn
 
-COPY rootfs /
+RUN git clone -b garden-runc https://github.com/cloudfoundry/bosh-deployment /usr/local/bosh-deployment
 
-COPY bosh-deployment /usr/local/bosh-deployment
-COPY bosh-warden-cpi-release /usr/local/bosh-warden-cpi-release
+COPY rootfs /
 

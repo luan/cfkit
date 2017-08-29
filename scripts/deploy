@@ -1,13 +1,23 @@
 #!/bin/bash
 
 set -e
-gobosh us ~/Downloads/bosh-stemcell-3421.11-warden-boshlite-ubuntu-trusty-go_agent.tgz
+git submodule update --init --recursive
+
+stemcell_path=~/Downloads/bosh-stemcell-3445.2-warden-boshlite-ubuntu-trusty-go_agent.tgz
+
+if ! [ -f "${stemcell_path}" ]; then
+  curl -o "${stemcell_path}" -L -J https://bosh.io/d/stemcells/bosh-warden-boshlite-ubuntu-trusty-go_agent?v=3445.2
+fi
+
+
+gobosh us "${stemcell_path}"
 gobosh ucc -n cf-deployment/bosh-lite/cloud-config.yml
 
 gobosh -d cf deploy cf-deployment/cf-deployment.yml \
   -v system_domain=bosh-lite.com --vars-store=./creds.yml \
   -o cf-deployment/operations/use-compiled-releases.yml \
   -o cf-deployment/operations/experimental/use-grootfs.yml \
-  -o cf-deployment/operations/bosh-lite.yml \
+  -o cf-ops-files/cfkit.yml \
+  -o cf-ops-files/cfkit-grootfs.yml \
   -n
 
